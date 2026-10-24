@@ -13,10 +13,11 @@
 ## 仓库与版本
 
 - 仓库：<https://github.com/zhihaofans/CrashKit>
-- 当前版本：`0.1.0`（tag 指向 `067310e`）
+- 最新发布：`0.1.0`（tag 指向 `067310e`）
 - Product：`CrashKit`（Swift Package library）
 - 工具链：`swift-tools-version: 5.9`，Swift 5 语言模式，零第三方依赖
-- 平台：iOS 16+ / macOS 13+。watchOS / tvOS 没验证过，**不要**自行加进 `platforms`
+- 平台：iOS 16+ / macOS 13+ / watchOS 9+。tvOS 没验证过，**不要**自行加进 `platforms`
+- watchOS 9+ 在 `main` 已通过设备/模拟器交叉构建；已发布的 `0.1.0` tag 不含，watchOS 接入需等新 tag
 - 测试：16 个用例，`swift test` 全绿
 
 ## 接入（消费方 AI 必读）
@@ -176,7 +177,8 @@ func application(
 
 - 记录格式是 16 字节定长：`CK01` + `Int32` 信号 + `Int64` 时间戳。改布局必须同时改 magic。
 - 信号处理器记完后要恢复 `SIG_DFL` 并重新 `raise`，不要假装能恢复进程。
-- 不要新增未验证的平台；watchOS / tvOS 需要真实构建和崩溃路径验证后再写进 `platforms`。
+- 不要新增未验证的平台；tvOS 需要真实构建和崩溃路径验证后再写进 `platforms`。
+- 改动信号或文件路径代码后，至少用 watchOS SDK 构建一次，别只跑 macOS 测试。
 - 公共 API 或磁盘格式变化时，升版本号并打新 tag；**不要移动已发布的 `0.1.0` tag**。
 
 ## 库自己的测试
@@ -193,6 +195,19 @@ swift test --scratch-path .build/scratch --cache-path .build/cache \
 
 如果报 `precompiled file ... was compiled with module cache path ...`，说明 `.build/modulecache`
 是从别的路径搬来的，删掉该目录后重跑。
+
+watchOS 交叉构建（设备架构；模拟器把 triple 换成
+`arm64-apple-watchos9.0-simulator`、SDK 换成 `watchsimulator`）：
+
+```bash
+TMPDIR="$PWD/.build/tmp" \
+SWIFTPM_MODULECACHE_OVERRIDE="$PWD/.build/watchos-modulecache" \
+CLANG_MODULE_CACHE_PATH="$PWD/.build/watchos-modulecache" \
+swift build --triple arm64_32-apple-watchos9.0 \
+  --sdk "$(xcrun --sdk watchos --show-sdk-path)" \
+  --scratch-path .build/watchos-scratch --cache-path .build/watchos-cache \
+  --manifest-cache none --disable-sandbox
+```
 
 ## 常见坑
 
@@ -211,5 +226,5 @@ swift test --scratch-path .build/scratch --cache-path .build/cache \
 - [ ] `takePendingReport()` 只消费一次，结果存起来再展示
 - [ ] 弹窗使用 `title` / `details`，或安全地使用结构化字段
 - [ ] 没有向用户承诺“不会闪退”
-- [ ] 平台最低版本满足 iOS 16+ / macOS 13+
+- [ ] 平台最低版本满足 iOS 16+ / macOS 13+ / watchOS 9+
 - [ ] DEBUG 下用 `crashForTesting()` 做过一次真实自检

@@ -10,7 +10,8 @@
 - 信号路径**只有编号和时间**。信号处理器里能用的只有 async-signal-safe 调用，取不了调用栈；
   要符号化堆栈得靠 MetricKit（次日系统回调）或 PLCrashReporter。
 - ObjC 异常（`NSException`）路径能拿到 `name` / `reason` / `stack`，因为那条路不在信号上下文里。
-- 只声明 **iOS 16+ / macOS 13+**。watchOS / tvOS 理论上可用但没有验证，所以没写进 `platforms`。
+- 只声明 **iOS 16+ / macOS 13+ / watchOS 9+**。tvOS 理论上可用但没有验证，所以没写进 `platforms`。
+- watchOS 9+ 已通过 SDK 交叉构建（设备 + 模拟器）；该支持目前在 `main`，`0.1.0` tag 尚未包含。
 
 ## 接入
 
