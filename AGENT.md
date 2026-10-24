@@ -13,11 +13,11 @@
 ## 仓库与版本
 
 - 仓库：<https://github.com/zhihaofans/CrashKit>
-- 最新发布：`0.1.0`（tag 指向 `067310e`）
+- 最新发布：`0.1.1`（含 watchOS 9+）
 - Product：`CrashKit`（Swift Package library）
 - 工具链：`swift-tools-version: 5.9`，Swift 5 语言模式，零第三方依赖
 - 平台：iOS 16+ / macOS 13+ / watchOS 9+。tvOS 没验证过，**不要**自行加进 `platforms`
-- watchOS 9+ 在 `main` 已通过设备/模拟器交叉构建；已发布的 `0.1.0` tag 不含，watchOS 接入需等新 tag
+- watchOS 9+ 已随 `0.1.1` 发布；设备 + 模拟器交叉构建通过，真机信号/异常路径仍建议自测
 - 测试：16 个用例，`swift test` 全绿
 
 ## 接入（消费方 AI 必读）
@@ -26,7 +26,7 @@
 
 1. File → Add Package Dependencies…
 2. URL 填 `https://github.com/zhihaofans/CrashKit.git`
-3. Dependency Rule 选 **Exact Version**，填 `0.1.0`
+3. Dependency Rule 选 **Exact Version**，填 `0.1.1`
 4. 把 `CrashKit` product 加到 App target 的 Frameworks, Libraries, and Embedded Content
 
 如果必须直接改 `project.pbxproj`，结构是：
@@ -37,7 +37,7 @@ XCRemoteSwiftPackageReference "CrashKit" = {
     repositoryURL = "https://github.com/zhihaofans/CrashKit.git";
     requirement = {
         kind = exactVersion;
-        version = 0.1.0;
+        version = 0.1.1;
     };
 };
 ```
@@ -51,7 +51,7 @@ object ID 尽量让 Xcode 生成；手改完用 `xcodebuild -resolvePackageDepen
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/zhihaofans/CrashKit.git", exact: "0.1.0"),
+    .package(url: "https://github.com/zhihaofans/CrashKit.git", exact: "0.1.1"),
 ],
 targets: [
     .target(
@@ -179,7 +179,7 @@ func application(
 - 信号处理器记完后要恢复 `SIG_DFL` 并重新 `raise`，不要假装能恢复进程。
 - 不要新增未验证的平台；tvOS 需要真实构建和崩溃路径验证后再写进 `platforms`。
 - 改动信号或文件路径代码后，至少用 watchOS SDK 构建一次，别只跑 macOS 测试。
-- 公共 API 或磁盘格式变化时，升版本号并打新 tag；**不要移动已发布的 `0.1.0` tag**。
+- 公共 API 或磁盘格式变化时，升版本号并打新 tag；**不要移动已发布的 tag（如 `0.1.0` / `0.1.1`）**。
 
 ## 库自己的测试
 
@@ -221,7 +221,7 @@ swift build --triple arm64_32-apple-watchos9.0 \
 
 ## 给消费方 AI 的检查清单
 
-- [ ] 依赖使用 remote URL + Exact Version `0.1.0`
+- [ ] 依赖使用 remote URL + Exact Version `0.1.1`
 - [ ] `install` 放在 App 启动最早处
 - [ ] `takePendingReport()` 只消费一次，结果存起来再展示
 - [ ] 弹窗使用 `title` / `details`，或安全地使用结构化字段

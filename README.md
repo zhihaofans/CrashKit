@@ -11,14 +11,14 @@
   要符号化堆栈得靠 MetricKit（次日系统回调）或 PLCrashReporter。
 - ObjC 异常（`NSException`）路径能拿到 `name` / `reason` / `stack`，因为那条路不在信号上下文里。
 - 只声明 **iOS 16+ / macOS 13+ / watchOS 9+**。tvOS 理论上可用但没有验证，所以没写进 `platforms`。
-- watchOS 9+ 已通过 SDK 交叉构建（设备 + 模拟器）；该支持目前在 `main`，`0.1.0` tag 尚未包含。
+- watchOS 9+ 已随 `0.1.1` 发布；设备 + 模拟器 SDK 交叉构建通过，真机上的信号/异常留痕仍建议用 `crashForTesting()` 自测。
 
 ## 接入
 
 ```swift
 // Package.swift
 .package(path: "../CrashKit")            // 本地
-.package(url: "https://github.com/<you>/CrashKit", exact: "0.1.0")   // 独立仓库
+.package(url: "https://github.com/zhihaofans/CrashKit.git", exact: "0.1.1")   // 独立仓库
 
 // 目标依赖
 .product(name: "CrashKit", package: "CrashKit")
