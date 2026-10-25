@@ -10,6 +10,7 @@
 //  - 信号处理器里只能用 async-signal-safe 调用：只做 `write` 到一个**启动时就打开**的 fd，
 //    不分配内存、不打印、不建 FileManager。复杂逻辑会引入二次崩溃。
 //  - 信号路径拿不到调用栈，只有编号和时间；要符号化堆栈得靠 MetricKit 或 PLCrashReporter。
+//  - watchOS 禁止给致命信号挂处理器，只有 NSException 路径可用；install 在手表上自动跳过信号捕获。
 //
 
 import Foundation
@@ -23,7 +24,8 @@ public final class CrashRecorder {
     public struct Options {
         /// 记录存放目录。默认 `Application Support/CrashKit`
         public var directory: URL?
-        /// 要捕获的信号。默认 6 个常见致命信号
+        /// 要捕获的信号。默认 6 个常见致命信号。
+        /// - Note: watchOS 上**始终忽略**（系统禁止给致命信号挂处理器），传了也不会生效
         public var signals: [Int32]
         /// 异常调用栈最多保留几行
         public var maxStackLines: Int
@@ -68,6 +70,7 @@ public final class CrashRecorder {
     /// 安装崩溃捕获。重复调用只有第一次生效。
     ///
     /// - Important: 越早调用越好（`App.init()` 里），否则第一帧之前的崩溃记不到。
+    /// - Note: watchOS 只安装异常处理器，信号捕获被系统禁止，`Options.signals` 会被忽略。
     public func install(options: Options = Options()) {
         Self.lock.lock()
         defer { Self.lock.unlock() }
@@ -88,6 +91,23 @@ public final class CrashRecorder {
         self.exceptionFile = exceptionFile
         self.signalFile = signalFile
 
+        NSSetUncaughtExceptionHandler { exception in
+            CrashRecorder.shared.record(exception: exception)
+        }
+
+        #if os(watchOS)
+        // watchOS 禁止给致命信号挂处理器：libsystem_c 会直接以
+        // "sigaction on fatal signals is not supported" 抛 SIGTRAP 杀掉进程。
+        // 所以这里连记录文件都不创建，只保留异常路径。
+        Self.signalFileDescriptor = -1
+        if !options.signals.isEmpty {
+            options.log?("[CrashKit] watchOS 不支持信号捕获，已忽略 signals=\(options.signals)")
+        }
+        // 让安装日志反映真实生效的配置，而不是原样打印传进来的 6 个信号
+        self.options.signals = []
+        // 清掉 0.1.1 在手表上留下的 0 字节信号文件；这里没有打开的 fd，unlink 是安全的
+        try? FileManager.default.removeItem(at: signalFile)
+        #else
         SignalRecordWriter.prepare()
 
         // **不要**用 O_TRUNC：启动时截断会把上次崩溃留下的记录清掉，
@@ -97,15 +117,13 @@ public final class CrashRecorder {
             options.log?("[CrashKit] 打开信号记录文件失败，errno=\(errno)")
         }
 
-        NSSetUncaughtExceptionHandler { exception in
-            CrashRecorder.shared.record(exception: exception)
-        }
         for signalNumber in options.signals {
             signal(signalNumber, crashKitSignalHandler)
         }
+        #endif
 
         Self.installed = true
-        options.log?("[CrashKit] 已安装，目录=\(directory.lastPathComponent)，信号=\(options.signals)，fd=\(Self.signalFileDescriptor)")
+        options.log?("[CrashKit] 已安装，目录=\(directory.lastPathComponent)，信号=\(self.options.signals)，fd=\(Self.signalFileDescriptor)")
     }
 
     // MARK: - 读取（下次启动）
@@ -234,6 +252,7 @@ public final class CrashRecorder {
     /// 让当前进程真的崩一次，用来验证接入是否生效（**只在 Debug 可用**）。
     ///
     /// 用法：接入后调一次，进程会立刻终止；下次启动 `takePendingReport()` 应该返回 `.signal` 记录。
+    /// - Note: watchOS 上没有信号处理器，只会崩溃、不会留下记录。
     #if DEBUG
     public func crashForTesting() {
         raise(SIGABRT)

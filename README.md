@@ -11,14 +11,16 @@
   要符号化堆栈得靠 MetricKit（次日系统回调）或 PLCrashReporter。
 - ObjC 异常（`NSException`）路径能拿到 `name` / `reason` / `stack`，因为那条路不在信号上下文里。
 - 只声明 **iOS 16+ / macOS 13+ / watchOS 9+**。tvOS 理论上可用但没有验证，所以没写进 `platforms`。
-- watchOS 9+ 已随 `0.1.1` 发布；设备 + 模拟器 SDK 交叉构建通过，真机上的信号/异常留痕仍建议用 `crashForTesting()` 自测。
+- watchOS 9+ 只能走**异常路径**：系统禁止给致命信号挂处理器（`sigaction on fatal signals is not supported`，
+  会直接 SIGTRAP 杀掉进程）。`install()` 在手表上会自动跳过信号捕获，`Options.signals` 被忽略；
+  `crashForTesting()` 在手表上只会崩溃，不会留下记录。
 
 ## 接入
 
 ```swift
 // Package.swift
 .package(path: "../CrashKit")            // 本地
-.package(url: "https://github.com/zhihaofans/CrashKit.git", exact: "0.1.1")   // 独立仓库
+.package(url: "https://github.com/zhihaofans/CrashKit.git", exact: "0.1.2")   // 独立仓库
 
 // 目标依赖
 .product(name: "CrashKit", package: "CrashKit")
@@ -50,7 +52,7 @@ struct MyApp: App {
 }
 ```
 
-`Options`：`directory`（默认 `Application Support/CrashKit`）、`signals`（默认 6 个致命信号）、
+`Options`：`directory`（默认 `Application Support/CrashKit`）、`signals`（默认 6 个致命信号；watchOS 上忽略）、
 `maxStackLines`（默认 6）、`log`（默认丢弃）。
 
 ## 验证接入是否生效
@@ -63,7 +65,11 @@ CrashRecorder.shared.crashForTesting()   // 真的 abort 当前进程
 
 进程会立刻终止；下次启动 `takePendingReport()` 应该返回一条 `.signal` 记录。
 
-## 四条硬约束（改错就静默失效，别"优化"掉）
+watchOS 上信号路径被系统禁止，`crashForTesting()` 不会留下记录；手表请用
+`NSException(name: .internalInconsistencyException, reason: "test", userInfo: nil).raise()`
+自测异常路径，下次启动应该返回一条 `.exception` 记录。
+
+## 四条硬约束（针对 iOS/macOS 的信号路径；改错就静默失效，别"优化"掉）
 
 1. **fd 必须用 `O_APPEND` 打开，绝不能用 `O_TRUNC`** —— 启动时截断会把上次崩溃的记录清掉，
    表现是「永远弹不出提示」。
@@ -85,7 +91,8 @@ CrashRecorder.shared.crashForTesting()   // 真的 abort 当前进程
 ```
 
 magic 不符的块（老版本文件 / 写坏的残片）解析时会被跳过，不会崩。
-异常记录是另一个文件 `pending-exception.json`。
+异常记录是另一个文件 `pending-exception.json`。watchOS 不会创建或写入 `pending-signal.bin`，
+只有 `pending-exception.json` 这一条路径。
 
 ## 测试
 
